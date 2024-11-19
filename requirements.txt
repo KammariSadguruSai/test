@@ -1,0 +1,8 @@
+streamlit
+pytesseract
+Pillow
+gtts
+requests
+langchain
+opencv-python
+google-cloud-vision
