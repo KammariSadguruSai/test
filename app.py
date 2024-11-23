@@ -1,62 +1,72 @@
 import streamlit as st
 from PIL import Image
-import pytesseract
 import pyttsx3
-from langchain.llms import GooglePalm
-from langchain import PromptTemplate
-from google.generativeai import configure
+from google.cloud import vision
+from langchain.chat_models import ChatOpenAI
 
-# Configure Google Generative AI
-API_KEY = "AIzaSyBLlqhxWW1Bav8XqbvTwPFSGEwaoC1rASg"
-configure(api_key=API_KEY)
+# Configure Google Cloud Vision API
+st.set_page_config(page_title="AI Assistant for Visually Impaired", layout="wide")
+st.title("AI Assistant for Visually Impaired")
 
-# Streamlit application setup
-st.set_page_config(page_title="AI Assistant for Visually Impaired")
-st.title("AI-Powered Assistance for Visually Impaired Individuals")
+# Set up TTS engine
+tts_engine = pyttsx3.init()
+tts_engine.setProperty('rate', 150)  # Adjust speech rate
+tts_engine.setProperty('volume', 0.9)  # Adjust volume
 
-# Upload image functionality
-uploaded_image = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
-if uploaded_image:
-    image = Image.open(uploaded_image)
-    st.image(image, caption="Uploaded Image", use_column_width=True)
+# Function for OCR using Google Vision API
+def extract_text_from_image(image_path):
+    client = vision.ImageAnnotatorClient()
+    with open(image_path, 'rb') as image_file:
+        content = image_file.read()
+    image = vision.Image(content=content)
+    response = client.text_detection(image=image)
+    if response.error.message:
+        raise Exception(f"{response.error.message}")
+    return response.text_annotations[0].description if response.text_annotations else ""
 
-    # Feature Selection
-    selected_features = st.multiselect(
-        "Select features to apply:",
-        ["Real-Time Scene Understanding", "Text-to-Speech Conversion"],
+# Function for real-time scene understanding using LangChain and ChatGPT
+def generate_scene_description(image_path):
+    # For simplicity, describe the image contents based on extracted OCR
+    ocr_text = extract_text_from_image(image_path)
+    prompt = (
+        "Describe the image and interpret its contents for a visually impaired person. "
+        f"Extracted text from the image: '{ocr_text}'."
     )
+    llm = ChatOpenAI(temperature=0.5)  # Using OpenAI GPT model
+    return llm.generate([{"role": "user", "content": prompt}]).generations[0][0]['text']
 
-    if "Real-Time Scene Understanding" in selected_features:
-        st.subheader("Real-Time Scene Understanding")
-        # Google Generative AI for scene description
-        llm = GooglePalm(model="text-bison-001", temperature=0.7)
-        prompt = PromptTemplate(
-            input_variables=["image_text"],
-            template="Describe the content of the image: {image_text}",
-        )
-        extracted_text = pytesseract.image_to_string(image)
-        scene_description = llm(prompt.format(image_text=extracted_text))
-        st.write("Scene Description:")
-        st.write(scene_description)
+# Function to play text as speech
+def text_to_speech(text):
+    tts_engine.say(text)
+    tts_engine.runAndWait()
 
-    if "Text-to-Speech Conversion" in selected_features:
-        st.subheader("Text-to-Speech Conversion")
-        # Extract text using pytesseract
-        extracted_text = pytesseract.image_to_string(image)
-        st.write("Extracted Text:")
-        st.write(extracted_text)
+# Streamlit app interface
+uploaded_image = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
 
-        # Convert extracted text to speech
-        engine = pyttsx3.init()
-        engine.say(extracted_text)
-        engine.runAndWait()
-        st.write("Speech output generated. (Audio will be heard locally)")
+if uploaded_image:
+    st.image(uploaded_image, caption="Uploaded Image", use_column_width=True)
+    
+    # Save the uploaded image temporarily
+    image_path = "uploaded_image.jpg"
+    with open(image_path, "wb") as f:
+        f.write(uploaded_image.getbuffer())
 
-st.sidebar.info(
-    """
-    This application uses:
-    - Google Generative AI for scene description.
-    - OCR with pytesseract for text extraction.
-    - pyttsx3 for text-to-speech conversion.
-    """
-)
+    # Scene Understanding
+    st.header("Scene Understanding")
+    try:
+        scene_description = generate_scene_description(image_path)
+        st.text_area("Generated Scene Description", scene_description, height=200)
+        if st.button("Play Scene Description"):
+            text_to_speech(scene_description)
+    except Exception as e:
+        st.error(f"Error in scene understanding: {e}")
+
+    # Text Extraction and Text-to-Speech
+    st.header("Text-to-Speech for Visual Content")
+    try:
+        extracted_text = extract_text_from_image(image_path)
+        st.text_area("Extracted Text", extracted_text, height=200)
+        if st.button("Play Extracted Text"):
+            text_to_speech(extracted_text)
+    except Exception as e:
+        st.error(f"Error in text extraction: {e}")
