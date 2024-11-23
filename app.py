@@ -1,72 +1,63 @@
 import streamlit as st
 from PIL import Image
-import pyttsx3
-from google.cloud import vision
+import torch  # For YOLO object detection
 from langchain.chat_models import ChatOpenAI
+import openai  # Replace with Google Generative AI API integration
+import cv2
+import numpy as np
 
-# Configure Google Cloud Vision API
-st.set_page_config(page_title="AI Assistant for Visually Impaired", layout="wide")
-st.title("AI Assistant for Visually Impaired")
+# Configure OpenAI API Key (Replace with Google Generative AI API if available)
+openai.api_key = "AIzaSyBSgtbnMK8b-lkuRQkD_WNYtrJaH2JmBPU"  # Add your API key
 
-# Set up TTS engine
-tts_engine = pyttsx3.init()
-tts_engine.setProperty('rate', 150)  # Adjust speech rate
-tts_engine.setProperty('volume', 0.9)  # Adjust volume
+# Load Pre-trained YOLOv5 Model
+model = torch.hub.load('ultralytics/yolov5', 'yolov5s')  # YOLOv5 small model
 
-# Function for OCR using Google Vision API
-def extract_text_from_image(image_path):
-    client = vision.ImageAnnotatorClient()
-    with open(image_path, 'rb') as image_file:
-        content = image_file.read()
-    image = vision.Image(content=content)
-    response = client.text_detection(image=image)
-    if response.error.message:
-        raise Exception(f"{response.error.message}")
-    return response.text_annotations[0].description if response.text_annotations else ""
+# Streamlit App
+st.title("AI-Powered Solution for Visually Impaired")
+st.subheader("Upload an image for assistance")
 
-# Function for real-time scene understanding using LangChain and ChatGPT
-def generate_scene_description(image_path):
-    # For simplicity, describe the image contents based on extracted OCR
-    ocr_text = extract_text_from_image(image_path)
-    prompt = (
-        "Describe the image and interpret its contents for a visually impaired person. "
-        f"Extracted text from the image: '{ocr_text}'."
-    )
-    llm = ChatOpenAI(temperature=0.5)  # Using OpenAI GPT model
-    return llm.generate([{"role": "user", "content": prompt}]).generations[0][0]['text']
+# Image Upload
+uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
 
-# Function to play text as speech
-def text_to_speech(text):
-    tts_engine.say(text)
-    tts_engine.runAndWait()
+if uploaded_file is not None:
+    # Display Uploaded Image
+    image = Image.open(uploaded_file)
+    st.image(image, caption="Uploaded Image", use_column_width=True)
 
-# Streamlit app interface
-uploaded_image = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
+    # ---- Real-Time Scene Understanding ----
+    st.subheader("1. Real-Time Scene Understanding")
+    with st.spinner("Analyzing the image..."):
+        # Simulated API call using OpenAI's GPT (replace with Google Generative AI)
+        image_caption = openai.Completion.create(
+            engine="text-davinci-003",
+            prompt=f"Describe the scene in the uploaded image in detail.",
+            max_tokens=100
+        )["choices"][0]["text"].strip()
+    st.write("**Generated Description:**", image_caption)
 
-if uploaded_image:
-    st.image(uploaded_image, caption="Uploaded Image", use_column_width=True)
-    
-    # Save the uploaded image temporarily
-    image_path = "uploaded_image.jpg"
-    with open(image_path, "wb") as f:
-        f.write(uploaded_image.getbuffer())
+    # ---- Object and Obstacle Detection ----
+    st.subheader("2. Object and Obstacle Detection")
+    with st.spinner("Detecting objects and obstacles..."):
+        # Convert PIL image to a format suitable for YOLOv5
+        image_cv = np.array(image.convert("RGB"))
+        results = model(image_cv)  # YOLO model inference
+        detected_image = np.squeeze(results.render())  # Annotated image
 
-    # Scene Understanding
-    st.header("Scene Understanding")
-    try:
-        scene_description = generate_scene_description(image_path)
-        st.text_area("Generated Scene Description", scene_description, height=200)
-        if st.button("Play Scene Description"):
-            text_to_speech(scene_description)
-    except Exception as e:
-        st.error(f"Error in scene understanding: {e}")
+        # Display Detected Objects
+        st.image(detected_image, caption="Detected Objects", use_column_width=True)
 
-    # Text Extraction and Text-to-Speech
-    st.header("Text-to-Speech for Visual Content")
-    try:
-        extracted_text = extract_text_from_image(image_path)
-        st.text_area("Extracted Text", extracted_text, height=200)
-        if st.button("Play Extracted Text"):
-            text_to_speech(extracted_text)
-    except Exception as e:
-        st.error(f"Error in text extraction: {e}")
+        # List Detected Objects
+        detected_objects = results.pandas().xyxy[0]["name"].tolist()
+        st.write("**Detected Objects:**", ", ".join(detected_objects))
+
+# Instructions to Install Required Libraries
+st.sidebar.title("Requirements")
+st.sidebar.write("""
+To run this app, ensure you have the following libraries installed:
+- `streamlit`
+- `Pillow`
+- `torch`
+- `opencv-python`
+- `langchain`
+- `openai` or Google Generative AI equivalent
+""")
