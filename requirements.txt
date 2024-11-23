@@ -8,3 +8,4 @@ opencv-python
 google-cloud-vision
 langchain_community
 pyttsx3
+google.generativeai
