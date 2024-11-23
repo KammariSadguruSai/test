@@ -6,3 +6,5 @@ opencv-python
 langchain
 openai
 langchain_community
+torch==1.12.1
+opencv-python==4.5.5.64
