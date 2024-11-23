@@ -6,7 +6,7 @@ import io
 import base64  # For handling image uploads
 
 # Replace with your actual Google Cloud API credentials and project ID
-# GOOGLE_APPLICATION_CREDENTIALS = "path/to/your/credentials.json"
+GOOGLE_APPLICATION_CREDENTIALS = "AIzaSyBSgtbnMK8b-lkuRQkD_WNYtrJaH2JmBPU"
 
 # Placeholder functions - REPLACE THESE with your actual Google Cloud API calls
 
