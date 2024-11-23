@@ -1,91 +1,68 @@
 import streamlit as st
 from PIL import Image
-import pytesseract
-from gtts import gTTS
+import pyttsx3
 import os
-from io import BytesIO
-from google.cloud import vision
-from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
-from langchain.chat_models import ChatOpenAI
+import pytesseract  
+import google.generativeai as genai
 
-# Configure Google Generative AI (Vision API)
-def google_vision_analysis(image_path):
-    client = vision.ImageAnnotatorClient()
-    with open(image_path, "rb") as img_file:
-        content = img_file.read()
-    image = vision.Image(content=content)
-    response = client.label_detection(image=image)
-    labels = response.label_annotations
-    description = [label.description for label in labels]
-    return description
+# Set Tesseract OCR path
+pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
-# Scene Understanding using LangChain
-def generate_scene_description(labels):
-    openai_llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.7)
-    prompt = PromptTemplate(
-        input_variables=["labels"],
-        template="Using the following keywords {labels}, generate a description of the scene in detail."
-    )
-    chain = LLMChain(llm=openai_llm, prompt=prompt)
-    return chain.run({"labels": labels})
+# Initialize Google Generative AI with API Key
+GEMINI_API_KEY = "AIzaSyBSgtbnMK8b-lkuRQkD_WNYtrJaH2JmBPU"  # Replace with your valid API key
+os.environ["GOOGLE_API_KEY"] = GEMINI_API_KEY
 
-# Text-to-Speech Conversion
+# Initialize Text-to-Speech engine
+engine = pyttsx3.init()
+
+# App Header
+st.title("VisionAssist 👁")
+st.subheader("AI for Scene Understanding, Text Extraction & Speech for the Visually Impaired")
+
+# Sidebar
+st.sidebar.title("ℹ About")
+st.sidebar.write("""
+- 🔍 Describe Scene: AI insights for image content.
+- 📝 Extract Text: OCR-based text extraction.
+- 🔊 Text-to-Speech: Hear the extracted text aloud.
+""")
+
+# Functions
+def extract_text_from_image(image):
+    return pytesseract.image_to_string(image)
+
 def text_to_speech(text):
-    tts = gTTS(text=text, lang="en")
-    audio_file = BytesIO()
-    tts.write_to_fp(audio_file)
-    audio_file.seek(0)
-    return audio_file
+    engine.say(text)
+    engine.runAndWait()
 
-# OCR Extraction
-def extract_text(image_path):
-    text = pytesseract.image_to_string(Image.open(image_path))
-    return text.strip()
+def generate_scene_description(prompt, image_data):
+    model = genai.GenerativeModel("gemini-1.5-pro")
+    response = model.generate_content([prompt, image_data])
+    return response.text
 
-# Streamlit Application
-def main():
-    st.title("AI-Powered Assistance for Visually Impaired Individuals")
-    st.subheader("Upload an image to use assistive functionalities.")
+# File Upload
+uploaded_file = st.file_uploader("Upload an Image", type=["jpg", "jpeg", "png"])
+if uploaded_file:
+    image = Image.open(uploaded_file)
+    st.image(image, caption="Uploaded Image", use_column_width=True)
 
-    uploaded_file = st.file_uploader("Upload Image", type=["jpg", "jpeg", "png"])
-    
-    if uploaded_file:
-        # Save and display uploaded image
-        image_path = f"temp_{uploaded_file.name}"
-        with open(image_path, "wb") as f:
-            f.write(uploaded_file.read())
-        image = Image.open(image_path)
-        st.image(image, caption="Uploaded Image", use_column_width=True)
+# Features
+col1, col2, col3 = st.columns(3)
+if col1.button("🔍 Describe Scene") and uploaded_file:
+    prompt = "Describe the scene in detail for a visually impaired person."
+    image_data = [{"mime_type": uploaded_file.type, "data": uploaded_file.getvalue()}]
+    st.write("Scene Description:", generate_scene_description(prompt, image_data))
 
-        # Choose functionality
-        st.sidebar.title("Select Feature")
-        features = ["Real-Time Scene Understanding", "Text-to-Speech Conversion"]
-        selected_feature = st.sidebar.radio("Choose a functionality", features)
+if col2.button("📝 Extract Text") and uploaded_file:
+    st.write("Extracted Text:", extract_text_from_image(image))
 
-        if selected_feature == "Real-Time Scene Understanding":
-            st.header("Real-Time Scene Understanding")
-            labels = google_vision_analysis(image_path)
-            st.write("Detected Objects/Labels:", labels)
+if col3.button("🔊 Text-to-Speech") and uploaded_file:
+    text = extract_text_from_image(image)
+    if text.strip():
+        text_to_speech(text)
+        st.success("✅ Speech Generated")
+    else:
+        st.warning("No text found!")
 
-            scene_description = generate_scene_description(labels)
-            st.write("Scene Description:")
-            st.success(scene_description)
-
-        elif selected_feature == "Text-to-Speech Conversion":
-            st.header("Text-to-Speech Conversion")
-            extracted_text = extract_text(image_path)
-            if extracted_text:
-                st.write("Extracted Text:")
-                st.info(extracted_text)
-                
-                audio_file = text_to_speech(extracted_text)
-                st.audio(audio_file, format="audio/mp3")
-            else:
-                st.error("No text found in the image.")
-
-        # Clean up
-        os.remove(image_path)
-
-if __name__ == "__main__":
-    main()
+# Footer
+st.sidebar.write("Powered by Google Gemini API | Built with ❤ using Streamlit")
