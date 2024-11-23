@@ -5,3 +5,4 @@ torchvision
 opencv-python
 langchain
 openai
+langchain_community
