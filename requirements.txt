@@ -6,3 +6,4 @@ requests
 langchain
 opencv-python
 google-cloud-vision
+langchain_community
