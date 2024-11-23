@@ -7,7 +7,7 @@ from langchain import PromptTemplate
 from google.generativeai import configure
 
 # Configure Google Generative AI
-API_KEY = "AIzaSyBSgtbnMK8b-lkuRQkD_WNYtrJaH2JmBPU"
+API_KEY = "AIzaSyBLlqhxWW1Bav8XqbvTwPFSGEwaoC1rASg"
 configure(api_key=API_KEY)
 
 # Streamlit application setup
