@@ -1,68 +1,75 @@
 import streamlit as st
+from langchain.llms import OpenAI # Or a suitable Langchain LLM wrapper for Google's Generative AI
+from langchain.prompts import PromptTemplate
 from PIL import Image
-import pyttsx3
-import os
-import pytesseract  
-import google.generativeai as genai
+import io
+import base64  # For handling image uploads
 
-# Set Tesseract OCR path
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+# Replace with your actual Google Cloud API credentials and project ID
+# GOOGLE_APPLICATION_CREDENTIALS = "path/to/your/credentials.json"
 
-# Initialize Google Generative AI with API Key
-GEMINI_API_KEY = "AIzaSyBSgtbnMK8b-lkuRQkD_WNYtrJaH2JmBPU"  # Replace with your valid API key
-os.environ["GOOGLE_API_KEY"] = GEMINI_API_KEY
+# Placeholder functions - REPLACE THESE with your actual Google Cloud API calls
 
-# Initialize Text-to-Speech engine
-engine = pyttsx3.init()
+def google_scene_understanding(image_bytes):
+    """Sends image to Google's API for scene understanding and returns a description."""
+    # Replace with your actual Google Cloud API call
+    #  This should send image_bytes to a suitable Vision API endpoint.
+    #  Example (replace with your specific API call):
+    #  response = client.annotate_image(...)
+    #  return response.description
+    description = "This is a placeholder scene description.  Replace with actual Google API call."
+    return description
 
-# App Header
-st.title("VisionAssist 👁")
-st.subheader("AI for Scene Understanding, Text Extraction & Speech for the Visually Impaired")
+def google_ocr(image_bytes):
+    """Performs OCR using Google's API and returns the extracted text."""
+    # Replace with your actual Google Cloud API call.  This should use the Document Text Analysis API.
+    # Example (replace with your specific API call):
+    # response = client.process_document(...)
+    # return response.text
+    extracted_text = "This is placeholder OCR text. Replace with actual Google API call."
+    return extracted_text
 
-# Sidebar
-st.sidebar.title("ℹ About")
-st.sidebar.write("""
-- 🔍 Describe Scene: AI insights for image content.
-- 📝 Extract Text: OCR-based text extraction.
-- 🔊 Text-to-Speech: Hear the extracted text aloud.
-""")
 
-# Functions
-def extract_text_from_image(image):
-    return pytesseract.image_to_string(image)
+def google_tts(text):
+    """Converts text to speech using Google's Cloud Text-to-Speech API."""
+    # Replace with your actual Google Cloud Text-to-Speech API call
+    # Example (replace with your specific API call):
+    # audio_content = client.synthesize_speech(...)
+    # return audio_content
+    audio_data = "This is placeholder audio data. Replace with actual Google API call." # Replace with actual audio bytes
+    return audio_data
 
-def text_to_speech(text):
-    engine.say(text)
-    engine.runAndWait()
 
-def generate_scene_description(prompt, image_data):
-    model = genai.GenerativeModel("gemini-1.5-pro")
-    response = model.generate_content([prompt, image_data])
-    return response.text
+st.title("AI-Powered Assistive Vision App")
 
-# File Upload
-uploaded_file = st.file_uploader("Upload an Image", type=["jpg", "jpeg", "png"])
-if uploaded_file:
+uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
+
+if uploaded_file is not None:
     image = Image.open(uploaded_file)
-    st.image(image, caption="Uploaded Image", use_column_width=True)
+    st.image(image, caption='Uploaded Image.', use_column_width=True)
+    image_bytes = io.BytesIO()
+    image.save(image_bytes, format=image.format)
+    image_bytes = image_bytes.getvalue()
 
-# Features
-col1, col2, col3 = st.columns(3)
-if col1.button("🔍 Describe Scene") and uploaded_file:
-    prompt = "Describe the scene in detail for a visually impaired person."
-    image_data = [{"mime_type": uploaded_file.type, "data": uploaded_file.getvalue()}]
-    st.write("Scene Description:", generate_scene_description(prompt, image_data))
 
-if col2.button("📝 Extract Text") and uploaded_file:
-    st.write("Extracted Text:", extract_text_from_image(image))
+    if st.button("Analyze Image"):
+        with st.spinner('Analyzing...'):
+            try:
+                scene_description = google_scene_understanding(image_bytes)
+                st.subheader("Scene Understanding:")
+                st.write(scene_description)
 
-if col3.button("🔊 Text-to-Speech") and uploaded_file:
-    text = extract_text_from_image(image)
-    if text.strip():
-        text_to_speech(text)
-        st.success("✅ Speech Generated")
-    else:
-        st.warning("No text found!")
+                extracted_text = google_ocr(image_bytes)
+                st.subheader("Text Extraction (OCR):")
+                st.write(extracted_text)
 
-# Footer
-st.sidebar.write("Powered by Google Gemini API | Built with ❤ using Streamlit")
+                audio_data = google_tts(extracted_text)
+
+                # Display audio using Streamlit (might need additional libraries like `pydub`)
+                #  This section is highly dependent on how you get audio data back from Google TTS.
+                if audio_data:
+                  st.audio(audio_data)
+
+
+            except Exception as e:
+                st.error(f"An error occurred: {e}")
